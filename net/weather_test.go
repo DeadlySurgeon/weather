@@ -17,7 +17,7 @@ func TestWeatherAtHandler(t *testing.T) {
 		name           string
 		lat            string
 		lon            string
-		mockReturn     interface{} // Use interface{} to handle both WeatherReport and error
+		mockReturn     weather.Report
 		mockReturnErr  error
 		expectedCode   int
 		expectedResult string
@@ -57,7 +57,7 @@ func TestWeatherAtHandler(t *testing.T) {
 			defer ctrl.Finish()
 
 			mockWeatherService := mock.NewMockService(ctrl)
-			if test.lat != "" && test.lon != "" { // Set up mock only for valid lat and lon
+			if test.lat != "" && test.lon != "" {
 				mockWeatherService.EXPECT().
 					At(test.lat, test.lon).
 					Return(test.mockReturn, test.mockReturnErr)
