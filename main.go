@@ -1,7 +1,9 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 
@@ -9,6 +11,8 @@ import (
 	"github.com/deadlysurgeon/weather/settings"
 	"github.com/deadlysurgeon/weather/weather"
 )
+
+const maxAttempts = 10
 
 func main() {
 	if err := run(); err != nil {
@@ -33,14 +37,35 @@ func run() error {
 		return fmt.Errorf("failed to set up net server instance: %w", err)
 	}
 
-	go func() {
-		c := make(chan os.Signal, 1)
-		signal.Notify(c, os.Interrupt)
-		<-c
-		fmt.Println("Stoping server")
+	go notify(server)
 
-		server.Stop()
-	}()
+	return serverLoop(server)
+}
 
-	return server.Start()
+func notify(server *net.Server) {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	<-c
+	fmt.Println("Stopping server")
+
+	server.Stop()
+	<-c
+	os.Exit(1)
+}
+
+func serverLoop(server *net.Server) error {
+	var attempts int
+	for {
+		if err := server.Start(); err != nil {
+			if errors.Is(err, http.ErrServerClosed) {
+				return nil
+			}
+			fmt.Fprintln(os.Stderr, "Server returned an error:", err)
+		}
+		attempts++
+		if attempts >= maxAttempts {
+			return fmt.Errorf("Failed too many times")
+		}
+		fmt.Println("Attempting to restart server...")
+	}
 }
